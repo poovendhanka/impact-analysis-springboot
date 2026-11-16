@@ -57,6 +57,7 @@ jobs:
         with:
           path: primary-repo
           fetch-depth: 0
+          persist-credentials: false
 
       # Step 3: Checkout companion repository latest main branch
       - name: Checkout Companion Repository (impact-analysis-react:main)
@@ -68,6 +69,7 @@ jobs:
           ref: main
           path: companion-repo
           fetch-depth: 1
+          persist-credentials: false
 
       # Step 4: Verify both repositories are accessible
       - name: Verify Repository Access
