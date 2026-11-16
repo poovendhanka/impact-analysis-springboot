@@ -84,3 +84,5 @@ public class CustomerRequest {
                 '}';
     }
 }
+
+// Test field annotation for cross-repository impact analysis verification
