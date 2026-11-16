@@ -1,0 +1,14 @@
+version: "1.0"
+services:
+  - id: customer-backend
+    name: Customer Management Backend Service
+    description: Core Spring Boot microservice for customer management
+    repository: poovendhanka/impact-analysis-springboot
+    owner: team-backend-core
+    apis:
+      - customer-api
+    depends_on:
+      - database-service
+    domain: CustomerDomain
+    system: CoreBanking
+    lifecycle: production
