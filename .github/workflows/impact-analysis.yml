@@ -240,14 +240,9 @@ jobs:
           IMPACT_LLM_API_KEY: ${{ secrets.IMPACT_LLM_API_KEY || '' }}
           IMPACT_GATE_MODE: ${{ vars.IMPACT_GATE_MODE || 'dry_run' }}
           CROSS_REPO_READ_TOKEN: ${{ secrets.CROSS_REPO_READ_TOKEN }}
-          OVERRIDE_USER: ${{ steps.detect-override.outputs.override_user }}
-          OVERRIDE_REASON: ${{ steps.detect-override.outputs.override_reason }}
+          GATE_OVERRIDE_USER: ${{ steps.detect-override.outputs.override_user }}
+          GATE_OVERRIDE_REASON: ${{ steps.detect-override.outputs.override_reason }}
         run: |
-          OVERRIDE_ARGS=""
-          if [ -n "$OVERRIDE_USER" ]; then
-            OVERRIDE_ARGS="--override-user $OVERRIDE_USER --override-reason $OVERRIDE_REASON --override-token $CROSS_REPO_READ_TOKEN"
-          fi
-
           python3 -m engine \
             --repos ./primary-repo ./companion-repo \
             --names impact-analysis-springboot impact-analysis-react \
@@ -259,7 +254,6 @@ jobs:
             --base origin/${{ github.base_ref }} \
             --head HEAD \
             --gate-mode "$IMPACT_GATE_MODE" \
-            $OVERRIDE_ARGS \
             --strict
 
       # Step 8.5: Extract Gate Decision Output
