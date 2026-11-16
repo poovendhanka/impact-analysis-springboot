@@ -1,0 +1,216 @@
+name: Cross-Repository Impact Analysis
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    branches:
+      - main
+
+# Least privilege: read repository contents, write PR comment
+permissions:
+  contents: read
+  pull-requests: write
+
+# Prevent duplicate/conflicting concurrent runs for the same PR
+concurrency:
+  group: impact-analysis-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare-impact-analysis:
+    name: Cross-Repository Impact Preparation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      COMPANION_REPO: poovendhanka/impact-analysis-react
+
+    steps:
+      # Step 1: Validate Cross-Repository Secret Availability
+      - name: Validate Cross-Repository Access Secret
+        id: check-secret
+        env:
+          HAS_TOKEN: ${{ secrets.CROSS_REPO_READ_TOKEN != '' }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          if [ "$HAS_TOKEN" = "false" ]; then
+            if [ "$IS_FORK" = "true" ]; then
+              echo "skip_analysis=true" >> "$GITHUB_OUTPUT"
+              echo "::warning::CROSS_REPO_READ_TOKEN secret is not available in fork PR. Gracefully skipping cross-repository analysis."
+            else
+              echo "::error::Required repository secret 'CROSS_REPO_READ_TOKEN' is missing or not configured."
+              echo "Please configure 'CROSS_REPO_READ_TOKEN' in repository secrets with Contents:Read and Metadata:Read permissions."
+              exit 1
+            fi
+          else
+            echo "skip_analysis=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Step 2: Checkout the PR branch in primary repository
+      - name: Checkout Primary PR Branch (impact-analysis-springboot)
+        if: steps.check-secret.outputs.skip_analysis != 'true'
+        uses: actions/checkout@v4
+        with:
+          path: primary-repo
+          fetch-depth: 0
+
+      # Step 3: Checkout companion repository latest main branch
+      - name: Checkout Companion Repository (impact-analysis-react:main)
+        if: steps.check-secret.outputs.skip_analysis != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.COMPANION_REPO }}
+          token: ${{ secrets.CROSS_REPO_READ_TOKEN }}
+          ref: main
+          path: companion-repo
+          fetch-depth: 1
+
+      # Step 4: Verify both repositories are accessible
+      - name: Verify Repository Access
+        if: steps.check-secret.outputs.skip_analysis != 'true'
+        run: |
+          echo "=== Verifying Local Directory Structure ==="
+          test -d primary-repo/.git || { echo "::error::Primary repo missing .git directory"; exit 1; }
+          test -d companion-repo/.git || { echo "::error::Companion repo (${COMPANION_REPO}) missing .git directory"; exit 1; }
+          echo "✓ Primary repository (impact-analysis-springboot) verified at $(pwd)/primary-repo"
+          echo "✓ Companion repository (${COMPANION_REPO}) verified at $(pwd)/companion-repo"
+
+      # Step 5: Collect PR metadata, changed files, and git diff
+      - name: Collect PR Metadata and Generate Analysis Input
+        id: collect-metadata
+        if: steps.check-secret.outputs.skip_analysis != 'true'
+        env:
+          CURRENT_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          mkdir -p analysis-input
+          cd primary-repo
+
+          # Fetch target base branch to ensure clean diffing
+          git fetch origin "$BASE_REF" --depth=1 || true
+
+          # Extract changed files list
+          git diff --name-only "origin/$BASE_REF"...HEAD > ../analysis-input/changed_files.txt
+          CHANGED_COUNT=$(grep -c '[^[:space:]]' ../analysis-input/changed_files.txt || echo "0")
+          echo "changed_count=$CHANGED_COUNT" >> "$GITHUB_OUTPUT"
+          export CHANGED_COUNT
+
+          # Extract full git unified diff
+          git diff "origin/$BASE_REF"...HEAD > ../analysis-input/changes.diff
+
+          cd ..
+
+          # Generate structured metadata JSON safely using environment variables
+          python3 -c "
+          import json, os, datetime
+
+          try:
+              count = int(os.environ.get('CHANGED_COUNT', '0'))
+          except ValueError:
+              count = 0
+
+          try:
+              pr_num = int(os.environ.get('PR_NUMBER', '0'))
+          except ValueError:
+              pr_num = 0
+
+          metadata = {
+              'repository': os.environ.get('CURRENT_REPO', ''),
+              'companion_repository': os.environ.get('COMPANION_REPO', ''),
+              'pr_number': pr_num,
+              'pr_title': os.environ.get('PR_TITLE', ''),
+              'pr_author': os.environ.get('PR_AUTHOR', ''),
+              'source_branch': os.environ.get('HEAD_REF', ''),
+              'target_branch': os.environ.get('BASE_REF', ''),
+              'head_sha': os.environ.get('HEAD_SHA', ''),
+              'base_sha': os.environ.get('BASE_SHA', ''),
+              'changed_files_count': count,
+              'generated_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+          }
+
+          with open('analysis-input/metadata.json', 'w', encoding='utf-8') as f:
+              json.dump(metadata, f, indent=2)
+
+          with open('analysis-input/changed_files.txt', 'r', encoding='utf-8') as f:
+              files = [line.strip() for line in f if line.strip()]
+
+          with open('analysis-input/changed_files.json', 'w', encoding='utf-8') as f:
+              json.dump(files, f, indent=2)
+          "
+
+          echo "Analysis input generation completed with $CHANGED_COUNT changed file(s)."
+
+      # Step 6: Upload the analysis input artifact (retention 7 days)
+      - name: Upload Analysis Input Artifact
+        if: steps.check-secret.outputs.skip_analysis != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: impact-analysis-input-pr-${{ github.event.pull_request.number }}
+          path: analysis-input/
+          retention-days: 7
+          if-no-files-found: error
+
+      # Step 7: Post or update integration comment on PR
+      - name: Publish or Update PR Status Comment
+        if: steps.check-secret.outputs.skip_analysis != 'true'
+        uses: actions/github-script@v7
+        env:
+          CHANGED_COUNT: ${{ steps.collect-metadata.outputs.changed_count }}
+        with:
+          script: |
+            const commentIdentifier = '<!-- id: cross-repo-impact-analysis -->';
+            const prNumber = context.payload.pull_request.number;
+            const changedCount = process.env.CHANGED_COUNT || '0';
+            const artifactName = `impact-analysis-input-pr-${prNumber}`;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const companionRepo = process.env.COMPANION_REPO;
+
+            const commentBody = `${commentIdentifier}
+            ### 🔍 Cross-Repository Impact Analysis Integration
+
+            | Status | Verification Check | Details |
+            | :---: | :--- | :--- |
+            | ✅ | **Current PR Repository Checkout** | \`${context.payload.repository.full_name}\` (branch: \`${context.payload.pull_request.head.ref}\`) |
+            | ✅ | **Companion Repository Checkout** | \`${companionRepo}\` (branch: \`main\`) |
+            | ℹ️ | **Changed Files in PR** | **${changedCount}** file(s) modified |
+            | 📦 | **Analysis Input Artifact** | [\`${artifactName}\`](${runUrl}) *(Retention: 7 days)* |
+
+            > **Integration Status:** Cross-repository access and input artifact packaging succeeded. Ready for AI Impact Analysis Agent execution.
+
+            *Last updated: ${new Date().toISOString()} (Workflow Run [#${context.runNumber}](${runUrl}))*`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            const existingComment = comments.find(c => c.body.includes(commentIdentifier));
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: commentBody,
+              });
+              console.log(`Updated existing integration comment (ID: ${existingComment.id})`);
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: commentBody,
+              });
+              console.log('Created new integration comment on PR #' + prNumber);
+            }

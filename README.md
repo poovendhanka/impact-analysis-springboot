@@ -187,3 +187,39 @@ http://localhost:8080/v3/api-docs
 - `CustomerResponse.java` ⇄ `impact-analysis-react/src/types/customer.ts` (`CustomerResponse`)
 - `@RequestMapping("/api/customers")` ⇄ `impact-analysis-react/src/services/customerService.ts` (`CUSTOMERS_ENDPOINT`)
 - Error response schema ⇄ `impact-analysis-react/src/types/customer.ts` (`ApiErrorResponse`)
+
+
+---
+
+## GitHub Actions Cross-Repository Integration
+
+A dedicated workflow (`.github/workflows/impact-analysis.yml`) automates cross-repository synchronization and prepares inputs for the upcoming AI Impact Analysis Agent whenever a Pull Request is opened or modified.
+
+### Workflow Triggers
+The workflow triggers on the `pull_request` event targeting the `main` branch under the following activity types:
+* `opened`
+* `synchronize` (new commits pushed to PR)
+* `reopened`
+* `ready_for_review`
+
+### Cross-Repository Secret: `CROSS_REPO_READ_TOKEN`
+To access the private companion repository (`poovendhanka/impact-analysis-react`), the workflow requires a fine-grained GitHub Personal Access Token stored as a repository secret:
+* **Secret Name:** `CROSS_REPO_READ_TOKEN`
+* **Target Repositories:** `impact-analysis-springboot` and `impact-analysis-react`
+* **Required Permissions:**
+  * `Repository permissions -> Contents: Read-only`
+  * `Repository permissions -> Metadata: Read-only`
+
+### Workflow Execution Flow
+1. **Security & Fork Gate:** Checks if `CROSS_REPO_READ_TOKEN` is present. If missing on normal PRs, fails with an actionable error; on fork PRs, skips gracefully without exposing secrets.
+2. **Dual Checkout:**
+   * Checks out the current repository PR branch into `./primary-repo`.
+   * Checks out `impact-analysis-react` (latest `main`) into `./companion-repo`.
+3. **Artifact Generation:** Packages PR metadata (`metadata.json`), modified file lists (`changed_files.json`), and the unified diff (`changes.diff`) into an artifact named `impact-analysis-input-pr-<PR_NUMBER>`.
+4. **Artifact Upload:** Retains the packaged analysis input artifact for **7 days**.
+5. **Idempotent PR Comment:** Uses `actions/github-script` to post a structured status summary on the PR. Subsequent commit pushes automatically update the existing comment without duplicate notifications.
+
+### Viewing Workflow Execution and Artifacts
+1. Go to the **Actions** tab in GitHub (`https://github.com/poovendhanka/impact-analysis-springboot/actions`).
+2. Select the **Cross-Repository Impact Analysis** workflow run corresponding to your PR.
+3. Scroll to the **Artifacts** section at the bottom of the summary page to download `impact-analysis-input-pr-<PR_NUMBER>.zip`.
