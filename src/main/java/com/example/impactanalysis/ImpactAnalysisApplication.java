@@ -1,3 +1,4 @@
+// Phase 3 Impact Analysis Engine CI verification comment
 package com.example.impactanalysis;
 
 import org.springframework.boot.SpringApplication;
@@ -10,3 +11,4 @@ public class ImpactAnalysisApplication {
         SpringApplication.run(ImpactAnalysisApplication.class, args);
     }
 }
+
