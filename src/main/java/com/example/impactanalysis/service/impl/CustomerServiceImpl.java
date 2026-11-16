@@ -32,7 +32,7 @@ public class CustomerServiceImpl implements CustomerService {
             throw new IllegalArgumentException("Registration request cannot be null");
         }
 
-        // 1. Normalize data: trim whitespace and lowercase email
+        // 1. Normalize data: trim whitespace and lowercase email (Phase 6 Scenario 2 internal update)
         String normalizedEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
         String trimmedName = request.getName() != null ? request.getName().trim() : "";
         String trimmedPhone = request.getPhone() != null ? request.getPhone().trim() : "";
