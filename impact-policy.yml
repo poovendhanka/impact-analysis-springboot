@@ -3,6 +3,9 @@ critical_components:
     symbols:
       - CustomerController
       - CustomerService
+  - repository: impact-analysis-react
+    symbols:
+      - CustomerForm
 
 critical_apis:
   - method: POST
@@ -13,3 +16,27 @@ severity_policy:
   require_owner_for_high: true
   require_evidence: true
   conservative_severity_on_disagreement: true
+
+gate:
+  mode: dry_run
+
+  blocking:
+    severities:
+      - CRITICAL
+    require_confirmed_evidence: true
+    require_policy_match_or_confirmed_breaking_change: true
+    ai_only_blocking_allowed: false
+
+  warnings:
+    severities:
+      - HIGH
+
+  analysis_errors:
+    action: fail_open
+
+  override:
+    enabled: true
+    required_permissions:
+      - maintain
+      - admin
+    require_reason: true
