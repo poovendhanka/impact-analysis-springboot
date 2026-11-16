@@ -155,7 +155,7 @@ jobs:
         if: steps.check-secret.outputs.skip_analysis != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: impact-analysis-input-pr-${{ github.event.pull_request.number }}
+          name: impact-analysis-input-pr-${{ github.event.pull_request.number }}-run-${{ github.run_number }}
           path: analysis-input/
           retention-days: 7
           if-no-files-found: error
@@ -171,7 +171,7 @@ jobs:
             const commentIdentifier = '<!-- id: cross-repo-impact-analysis -->';
             const prNumber = context.payload.pull_request.number;
             const changedCount = process.env.CHANGED_COUNT || '0';
-            const artifactName = `impact-analysis-input-pr-${prNumber}`;
+            const artifactName = `impact-analysis-input-pr-${prNumber}-run-${context.runNumber}`;
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const companionRepo = process.env.COMPANION_REPO;
 
