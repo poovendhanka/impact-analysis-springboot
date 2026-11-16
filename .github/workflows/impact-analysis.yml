@@ -197,12 +197,14 @@ jobs:
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          SENDER_LOGIN: ${{ github.event.sender.login }}
         run: |
           python3 -c "
           import json, os, re
 
           pr_body = os.environ.get('PR_BODY') or ''
           pr_author = os.environ.get('PR_AUTHOR') or ''
+          sender_login = os.environ.get('SENDER_LOGIN') or ''
 
           labels = []
           try:
@@ -218,10 +220,14 @@ jobs:
               override_reason = (match.group(1) or match.group(2) or '').strip()
 
           override_user = ''
-          if 'gate-override' in labels or override_reason:
+          if 'gate-override' in labels:
+              # Maintainer applying label
+              override_user = sender_login or pr_author
+              if not override_reason:
+                  override_reason = f'PR labeled with gate-override by @{override_user}'
+          elif override_reason:
+              # Requester in PR body is attributed strictly to PR author
               override_user = pr_author
-              if not override_reason and 'gate-override' in labels:
-                  override_reason = 'PR labeled with gate-override'
 
           print(f'Detected override: user={override_user}, reason={override_reason}')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
