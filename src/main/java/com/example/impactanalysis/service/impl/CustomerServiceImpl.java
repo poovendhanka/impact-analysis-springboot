@@ -33,6 +33,7 @@ public class CustomerServiceImpl implements CustomerService {
         }
 
         // 1. Normalize data: trim whitespace and lowercase email
+        // Phase 5 Scenario 2: Internal email normalization optimization
         String normalizedEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
         String trimmedName = request.getName() != null ? request.getName().trim() : "";
         String trimmedPhone = request.getPhone() != null ? request.getPhone().trim() : "";
