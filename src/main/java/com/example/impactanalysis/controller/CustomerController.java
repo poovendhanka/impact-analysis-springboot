@@ -54,6 +54,7 @@ public class CustomerController {
     })
     @PostMapping
     public ResponseEntity<CustomerResponse> registerCustomer(@Valid @RequestBody CustomerRequest request) {
+        // Updated registration workflow with enhanced audit tracking
         CustomerResponse response = customerService.registerCustomer(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
