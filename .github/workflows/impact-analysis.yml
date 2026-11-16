@@ -183,11 +183,22 @@ jobs:
       - name: Run Impact Analysis Engine
         id: run-engine
         if: steps.check-secret.outputs.skip_analysis != 'true'
+        env:
+          IMPACT_LLM_ENABLED: ${{ secrets.IMPACT_LLM_ENABLED || 'false' }}
+          IMPACT_LLM_BASE_URL: ${{ secrets.IMPACT_LLM_BASE_URL || '' }}
+          IMPACT_LLM_MODEL: ${{ secrets.IMPACT_LLM_MODEL || '' }}
+          IMPACT_LLM_API_KEY: ${{ secrets.IMPACT_LLM_API_KEY || '' }}
         run: |
           python3 -m engine \
             --repos ./primary-repo ./companion-repo \
             --names impact-analysis-springboot impact-analysis-react \
             --output-dir ./impact-graph-output \
+            --pr-mode \
+            --pr-repo ./primary-repo \
+            --pr-name impact-analysis-springboot \
+            --diff-file ./analysis-input/changes.diff \
+            --base origin/${{ github.base_ref }} \
+            --head HEAD \
             --strict
 
       # Step 9: Upload Unified Dependency Graph Artifacts (retention 7 days)
@@ -228,9 +239,13 @@ jobs:
 
             let summaryMarkdown = '';
             try {
-              summaryMarkdown = fs.readFileSync('impact-graph-output/graph-summary.md', 'utf8');
+              summaryMarkdown = fs.readFileSync('impact-graph-output/impact-analysis.md', 'utf8');
             } catch (e) {
-              summaryMarkdown = '> Graph summary file could not be read.';
+              try {
+                summaryMarkdown = fs.readFileSync('impact-graph-output/graph-summary.md', 'utf8');
+              } catch (e2) {
+                summaryMarkdown = '> Graph summary file could not be read.';
+              }
             }
 
             const commentBody = `${commentIdentifier}
