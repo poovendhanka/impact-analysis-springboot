@@ -1,3 +1,4 @@
+// AI Impact Analysis Verification: Second commit for synchronize re-execution
 package com.example.impactanalysis.service;
 
 import com.example.impactanalysis.dto.CustomerRequest;
@@ -33,3 +34,4 @@ public interface CustomerService {
      */
     CustomerResponse getCustomerById(Long id);
 }
+
