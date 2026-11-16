@@ -1,3 +1,4 @@
+// AI Impact Analysis Verification: CustomerController REST controller
 package com.example.impactanalysis.controller;
 
 import com.example.impactanalysis.dto.CustomerRequest;
@@ -76,3 +77,4 @@ public class CustomerController {
         return ResponseEntity.ok(customerService.getCustomerById(id));
     }
 }
+
