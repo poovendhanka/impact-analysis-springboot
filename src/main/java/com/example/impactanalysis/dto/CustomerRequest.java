@@ -32,6 +32,11 @@ public class CustomerRequest {
     @Size(max = 500, message = "Message must not exceed 500 characters")
     private String message;
 
+    @Schema(description = "Optional company or organization name", example = "Acme Inc")
+    @Size(max = 100, message = "Company name must not exceed 100 characters")
+    // Synchronized test: Phase 4 Scenario 2 schema impact verification
+    private String company;
+
     public CustomerRequest() {
     }
 
@@ -72,6 +77,14 @@ public class CustomerRequest {
 
     public void setMessage(String message) {
         this.message = message;
+    }
+
+    public String getCompany() {
+        return company;
+    }
+
+    public void setCompany(String company) {
+        this.company = company;
     }
 
     @Override
