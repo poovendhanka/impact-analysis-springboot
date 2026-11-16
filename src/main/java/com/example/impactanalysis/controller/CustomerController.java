@@ -54,6 +54,10 @@ public class CustomerController {
     })
     @PostMapping
     public ResponseEntity<CustomerResponse> registerCustomer(@Valid @RequestBody CustomerRequest request) {
+        // Phase 5 Scenario 4: Critical business component modification & audit check
+        if (request == null) {
+            return ResponseEntity.badRequest().build();
+        }
         CustomerResponse response = customerService.registerCustomer(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
