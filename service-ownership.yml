@@ -1,0 +1,13 @@
+owners:
+  - repository: impact-analysis-springboot
+    paths:
+      - src/main/java/com/example/impactanalysis/controller/
+    team: api-platform-team
+  - repository: impact-analysis-springboot
+    paths:
+      - src/main/java/com/example/impactanalysis/service/
+    team: customer-core-team
+  - repository: impact-analysis-springboot
+    paths:
+      - src/main/java/com/example/impactanalysis/dto/
+    team: schema-contracts-team

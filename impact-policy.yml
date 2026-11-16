@@ -1,0 +1,15 @@
+critical_components:
+  - repository: impact-analysis-springboot
+    symbols:
+      - CustomerController
+      - CustomerService
+
+critical_apis:
+  - method: POST
+    path: /api/customers
+
+severity_policy:
+  fail_on_unknown: false
+  require_owner_for_high: true
+  require_evidence: true
+  conservative_severity_on_disagreement: true

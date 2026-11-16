@@ -1,0 +1,4 @@
+* @backend-team
+src/main/java/com/example/impactanalysis/controller/* @api-platform-team
+src/main/java/com/example/impactanalysis/service/* @customer-core-team
+src/main/java/com/example/impactanalysis/dto/* @schema-contracts-team
