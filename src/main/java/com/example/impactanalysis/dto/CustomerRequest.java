@@ -34,6 +34,7 @@ public class CustomerRequest {
 
     @Schema(description = "Optional company or organization name", example = "Acme Inc")
     @Size(max = 100, message = "Company name must not exceed 100 characters")
+    // Synchronized test: Phase 4 Scenario 2 schema impact verification
     private String company;
 
     public CustomerRequest() {
