@@ -32,6 +32,10 @@ public class CustomerRequest {
     @Size(max = 500, message = "Message must not exceed 500 characters")
     private String message;
 
+    @Schema(description = "Preferred contact time window (optional)", example = "morning")
+    @Size(max = 50, message = "Preferred contact time must not exceed 50 characters")
+    private String preferredContactTime;
+
     public CustomerRequest() {
     }
 
@@ -40,6 +44,14 @@ public class CustomerRequest {
         this.email = email;
         this.phone = phone;
         this.message = message;
+    }
+
+    public CustomerRequest(String name, String email, String phone, String message, String preferredContactTime) {
+        this.name = name;
+        this.email = email;
+        this.phone = phone;
+        this.message = message;
+        this.preferredContactTime = preferredContactTime;
     }
 
     public String getName() {
@@ -74,6 +86,14 @@ public class CustomerRequest {
         this.message = message;
     }
 
+    public String getPreferredContactTime() {
+        return preferredContactTime;
+    }
+
+    public void setPreferredContactTime(String preferredContactTime) {
+        this.preferredContactTime = preferredContactTime;
+    }
+
     @Override
     public String toString() {
         return "CustomerRequest{" +
@@ -81,6 +101,7 @@ public class CustomerRequest {
                 ", email='" + email + '\'' +
                 ", phone='" + phone + '\'' +
                 ", message='" + message + '\'' +
+                ", preferredContactTime='" + preferredContactTime + '\'' +
                 '}';
     }
 }
