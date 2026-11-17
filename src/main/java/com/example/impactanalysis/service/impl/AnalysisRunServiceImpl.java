@@ -106,7 +106,8 @@ public class AnalysisRunServiceImpl implements AnalysisRunService {
         long wouldBlockCount = repository.countByGateDecision("WOULD_BLOCK");
 
         long successfulGates = passCount + passWithWarningCount;
-        double passRate = totalRuns > 0 ? (double) successfulGates / totalRuns * 100.0 : 100.0;
+        double rawPassPercentage = totalRuns > 0 ? (double) successfulGates / totalRuns * 100.0 : 100.0;
+        double roundedPassRate = Math.round(rawPassPercentage * 10.0) / 10.0;
 
         Map<String, Long> severityBreakdown = new LinkedHashMap<>();
         severityBreakdown.put("CRITICAL", criticalCount);
@@ -125,7 +126,7 @@ public class AnalysisRunServiceImpl implements AnalysisRunService {
                 4L,  // Discovered Services
                 4L,  // Active Contracts (OpenAPI & AsyncAPI)
                 totalRuns,
-                Math.round(passRate * 10.0) / 10.0,
+                roundedPassRate,
                 38,  // Declared edges in CIR graph
                 14,  // Observed runtime telemetry edges
                 2,   // Static vs runtime discrepancies
