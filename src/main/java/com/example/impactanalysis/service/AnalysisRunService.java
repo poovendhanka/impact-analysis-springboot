@@ -12,7 +12,7 @@ public interface AnalysisRunService {
 
     AnalysisRunResponse recordRun(AnalysisRunRequest request);
 
-    Page<AnalysisRunResponse> getHistoryId(String repository, String severity, String gateDecision, Integer prNumber, Pageable pageable);
+    Page<AnalysisRunResponse> getHistory(String repository, String severity, String gateDecision, Integer prNumber, Pageable pageable);
 
     Optional<AnalysisRunResponse> getRunByRunId(String runId);
 
