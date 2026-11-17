@@ -19,9 +19,6 @@ public class CustomerResponse {
     @Schema(description = "Customer's primary email address", example = "john@example.com")
     private String email;
 
-    @Schema(description = "Customer's phone number", example = "9876543210")
-    private String phone;
-
     @Schema(description = "Customer's message or notes", example = "Sample customer registration")
     private String message;
 
@@ -34,11 +31,10 @@ public class CustomerResponse {
     public CustomerResponse() {
     }
 
-    public CustomerResponse(Long id, String name, String email, String phone, String message, LocalDateTime createdAt, String status) {
+    public CustomerResponse(Long id, String name, String email, String message, LocalDateTime createdAt, String status) {
         this.id = id;
         this.name = name;
         this.email = email;
-        this.phone = phone;
         this.message = message;
         this.createdAt = createdAt;
         this.status = status;
@@ -66,14 +62,6 @@ public class CustomerResponse {
 
     public void setEmail(String email) {
         this.email = email;
-    }
-
-    public String getPhone() {
-        return phone;
-    }
-
-    public void setPhone(String phone) {
-        this.phone = phone;
     }
 
     public String getMessage() {
