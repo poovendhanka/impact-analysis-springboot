@@ -1,0 +1,138 @@
+name: Post-Merge Dependency Graph Maintenance
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: graph-maintenance-main
+  cancel-in-progress: false
+
+jobs:
+  update-graph:
+    name: Build & Publish Baseline Dependency Graph
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      COMPANION_REPO: poovendhanka/impact-analysis-react
+      ENGINE_REPO: poovendhanka/impact-analysis-engine
+
+    steps:
+      - name: Validate Cross-Repository Access Secret
+        id: check-secret
+        env:
+          HAS_TOKEN: ${{ secrets.CROSS_REPO_READ_TOKEN != '' }}
+        run: |
+          if [ "$HAS_TOKEN" = "false" ]; then
+            echo "::error::Required secret 'CROSS_REPO_READ_TOKEN' is missing or not configured."
+            exit 1
+          fi
+
+      - name: Checkout Primary Repository (impact-analysis-springboot:main)
+        uses: actions/checkout@v4
+        with:
+          path: primary-repo
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout Companion Repository (${{ env.COMPANION_REPO }}:main)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.COMPANION_REPO }}
+          token: ${{ secrets.CROSS_REPO_READ_TOKEN }}
+          ref: main
+          path: companion-repo
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout Impact Analysis Engine
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ENGINE_REPO }}
+          token: ${{ secrets.CROSS_REPO_READ_TOKEN }}
+          ref: main
+          path: engine-repo
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Analysis Engine
+        run: |
+          pip install ./engine-repo
+
+      - name: Generate Unified Baseline Dependency Graph
+        run: |
+          mkdir -p baseline-graph-output
+          python3 -m engine \
+            --repos ./primary-repo ./companion-repo \
+            --names impact-analysis-springboot impact-analysis-react \
+            --output-dir ./baseline-graph-output
+
+      - name: Generate GitHub Actions Job Summary
+        run: |
+          python3 -c "
+          import json, os
+
+          meta_file = 'baseline-graph-output/analysis-metadata.json'
+          summary_file = 'baseline-graph-output/graph-summary.md'
+          github_summary = os.environ.get('GITHUB_STEP_SUMMARY')
+
+          meta = {}
+          if os.path.exists(meta_file):
+              try:
+                  with open(meta_file, 'r', encoding='utf-8') as f:
+                      meta = json.load(f)
+              except Exception:
+                  pass
+
+          nodes = meta.get('total_nodes', 'N/A')
+          edges = meta.get('total_edges', 'N/A')
+          cross_links = meta.get('cross_repository_edges', 'N/A')
+          analyzed_at = meta.get('analyzed_at', 'N/A')
+
+          lines = [
+              '# 🌐 Post-Merge Baseline Dependency Graph Updated',
+              '',
+              '| Metric | Value |',
+              '| :--- | :--- |',
+              f'| **Trigger Event** | \`{os.environ.get(\"GITHUB_EVENT_NAME\", \"push\")}\` on \`main\` |',
+              f'| **Commit SHA** | \`{os.environ.get(\"GITHUB_SHA\", \"\")[:8]}\` |',
+              f'| **Total Graph Nodes** | **{nodes}** |',
+              f'| **Total Dependency Edges** | **{edges}** |',
+              f'| **Cross-Repo Linkages** | **{cross_links}** |',
+              f'| **Analyzed At** | \`{analyzed_at}\` |',
+              '',
+              '---',
+              ''
+          ]
+
+          if os.path.exists(summary_file):
+              try:
+                  with open(summary_file, 'r', encoding='utf-8') as f:
+                      lines.append(f.read())
+              except Exception:
+                  pass
+
+          if github_summary:
+              with open(github_summary, 'a', encoding='utf-8') as out:
+                  out.write('\n'.join(lines) + '\n')
+          "
+
+      - name: Upload Baseline Dependency Graph Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-dependency-graph-main
+          path: baseline-graph-output/
+          retention-days: 90
+          if-no-files-found: error
