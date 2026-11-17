@@ -400,8 +400,8 @@ jobs:
           echo "Gate Decision:       $GATE_DECISION"
           echo "Is Blocked:          $IS_BLOCKED"
 
-          if [ "$ANALYSIS_STATUS" = "cancelled" ]; then
-            echo "::error::Impact analysis workflow was cancelled. Failing gate check."
+          if [ "$ANALYSIS_STATUS" = "cancelled" ] || [ "$ANALYSIS_STATUS" = "failure" ]; then
+            echo "::error::Impact analysis workflow failed or was cancelled. Failing gate check (fail-closed)."
             exit 1
           fi
 

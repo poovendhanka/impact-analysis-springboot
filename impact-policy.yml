@@ -6,10 +6,18 @@ critical_components:
   - repository: impact-analysis-react
     symbols:
       - CustomerForm
+  - repository: impact-analysis-dotnet
+    symbols:
+      - RiskAssessmentController
+  - repository: impact-analysis-python
+    symbols:
+      - evaluate_risk
 
 critical_apis:
   - method: POST
     path: /api/customers
+  - method: GET
+    path: /api/customers/{id}
 
 severity_policy:
   fail_on_unknown: false
@@ -18,21 +26,22 @@ severity_policy:
   conservative_severity_on_disagreement: true
 
 gate:
-  mode: dry_run
+  mode: enforce
 
   blocking:
     severities:
       - CRITICAL
+      - HIGH
     require_confirmed_evidence: true
-    require_policy_match_or_confirmed_breaking_change: true
+    require_policy_match_or_confirmed_breaking_change: false
     ai_only_blocking_allowed: false
 
   warnings:
     severities:
-      - HIGH
+      - MEDIUM
 
   analysis_errors:
-    action: fail_open
+    action: fail_closed
 
   override:
     enabled: true

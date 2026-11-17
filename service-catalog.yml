@@ -9,6 +9,25 @@ services:
       - customer-api
     depends_on:
       - database-service
+    downstream_consumers:
+      - service: python-risk-service
+        repository: poovendhanka/impact-analysis-python
+        consumed_apis:
+          - "GET /api/customers/{id}"
+      - service: dotnet-api-gateway
+        repository: poovendhanka/impact-analysis-dotnet
+        consumed_apis:
+          - "GET /api/customers/{id}"
+      - service: react-frontend
+        repository: poovendhanka/impact-analysis-react
+        consumed_apis:
+          - "POST /api/customers"
+          - "GET /api/customers"
+          - "GET /api/customers/{id}"
+      - service: angular-frontend
+        repository: poovendhanka/impact-analysis-angular
+        consumed_apis:
+          - "GET /api/customers/{id} (via dotnet-api-gateway)"
     domain: CustomerDomain
     system: CoreBanking
     lifecycle: production
