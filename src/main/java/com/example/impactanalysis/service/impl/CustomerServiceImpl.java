@@ -80,6 +80,7 @@ public class CustomerServiceImpl implements CustomerService {
                 entity.getId(),
                 entity.getName(),
                 entity.getEmail(),
+                entity.getPhone(),
                 entity.getMessage(),
                 entity.getCreatedAt(),
                 "SUCCESS"
