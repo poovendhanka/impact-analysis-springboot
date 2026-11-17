@@ -29,21 +29,39 @@ public class AnalysisRunServiceImpl implements AnalysisRunService {
                 ? request.runId()
                 : UUID.randomUUID().toString();
 
-        AnalysisRunEntity entity = new AnalysisRunEntity(
-                runId,
-                request.repository(),
-                request.commitSha(),
-                request.prNumber(),
-                request.branch() != null ? request.branch() : "main",
-                request.severity().toUpperCase(),
-                request.gateDecision().toUpperCase(),
-                request.durationSeconds() != null ? request.durationSeconds() : 0.0,
-                request.totalNodes() != null ? request.totalNodes() : 0,
-                request.totalEdges() != null ? request.totalEdges() : 0,
-                request.breakingChangesCount() != null ? request.breakingChangesCount() : 0,
-                request.reportMarkdown() != null ? request.reportMarkdown() : "",
-                request.reportJson() != null ? request.reportJson() : ""
-        );
+        Optional<AnalysisRunEntity> existing = repository.findByRunId(runId);
+        AnalysisRunEntity entity;
+        if (existing.isPresent()) {
+            entity = existing.get();
+            entity.setRepository(request.repository());
+            entity.setCommitSha(request.commitSha());
+            entity.setPrNumber(request.prNumber());
+            entity.setBranch(request.branch() != null ? request.branch() : "main");
+            entity.setSeverity(request.severity().toUpperCase());
+            entity.setGateDecision(request.gateDecision().toUpperCase());
+            entity.setDurationSeconds(request.durationSeconds() != null ? request.durationSeconds() : 0.0);
+            entity.setTotalNodes(request.totalNodes() != null ? request.totalNodes() : 0);
+            entity.setTotalEdges(request.totalEdges() != null ? request.totalEdges() : 0);
+            entity.setBreakingChangesCount(request.breakingChangesCount() != null ? request.breakingChangesCount() : 0);
+            entity.setReportMarkdown(request.reportMarkdown() != null ? request.reportMarkdown() : "");
+            entity.setReportJson(request.reportJson() != null ? request.reportJson() : "");
+        } else {
+            entity = new AnalysisRunEntity(
+                    runId,
+                    request.repository(),
+                    request.commitSha(),
+                    request.prNumber(),
+                    request.branch() != null ? request.branch() : "main",
+                    request.severity().toUpperCase(),
+                    request.gateDecision().toUpperCase(),
+                    request.durationSeconds() != null ? request.durationSeconds() : 0.0,
+                    request.totalNodes() != null ? request.totalNodes() : 0,
+                    request.totalEdges() != null ? request.totalEdges() : 0,
+                    request.breakingChangesCount() != null ? request.breakingChangesCount() : 0,
+                    request.reportMarkdown() != null ? request.reportMarkdown() : "",
+                    request.reportJson() != null ? request.reportJson() : ""
+            );
+        }
 
         AnalysisRunEntity saved = repository.save(entity);
         return mapToResponse(saved);

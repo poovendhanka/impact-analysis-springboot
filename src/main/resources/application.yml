@@ -35,3 +35,15 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
+
+# Spring Boot Actuator Observability & Health Checks
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
