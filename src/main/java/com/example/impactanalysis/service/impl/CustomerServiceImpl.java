@@ -4,6 +4,7 @@ import com.example.impactanalysis.dto.CustomerRequest;
 import com.example.impactanalysis.dto.CustomerResponse;
 import com.example.impactanalysis.entity.CustomerEntity;
 import com.example.impactanalysis.exception.CustomerAlreadyExistsException;
+import com.example.impactanalysis.exception.CustomerNotFoundException;
 import com.example.impactanalysis.repository.CustomerRepository;
 import com.example.impactanalysis.service.CustomerService;
 import org.springframework.stereotype.Service;
@@ -70,7 +71,7 @@ public class CustomerServiceImpl implements CustomerService {
     @Transactional(readOnly = true)
     public CustomerResponse getCustomerById(Long id) {
         CustomerEntity entity = customerRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Customer with ID " + id + " not found"));
+                .orElseThrow(() -> new CustomerNotFoundException("Customer with ID " + id + " not found"));
         return mapToResponse(entity);
     }
 

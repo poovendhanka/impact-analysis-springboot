@@ -1,0 +1,35 @@
+asyncapi: '2.6.0'
+info:
+  title: Customer Service Events
+  version: '1.0.0'
+  description: Asynchronous event streams for Customer domain lifecycle events.
+servers:
+  production:
+    url: kafka.internal:9092
+    protocol: kafka
+    description: Production Kafka Broker Cluster
+channels:
+  customer-events:
+    description: Topic for customer lifecycle events (creation, profile updates, account deletion)
+    publish:
+      summary: Customer event publication
+      operationId: publishCustomerEvent
+      message:
+        name: CustomerEvent
+        title: Customer Lifecycle Event
+        contentType: application/json
+        payload:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+            eventType:
+              type: string
+              enum: [CREATED, UPDATED, DELETED]
+          required:
+            - id
+            - eventType

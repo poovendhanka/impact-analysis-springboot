@@ -7,6 +7,8 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+      - labeled
+      - unlabeled
     branches:
       - main
 
@@ -25,6 +27,12 @@ jobs:
     name: Cross-Repository Impact & Graph Analysis
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
+    outputs:
+      skip_analysis: ${{ steps.check-secret.outputs.skip_analysis }}
+      gate_decision: ${{ steps.extract-gate.outputs.gate_decision }}
+      gate_mode: ${{ steps.extract-gate.outputs.gate_mode }}
+      is_blocked: ${{ steps.extract-gate.outputs.is_blocked }}
 
     env:
       COMPANION_REPO: poovendhanka/impact-analysis-react
@@ -127,6 +135,9 @@ jobs:
 
           cd ..
 
+          # Save labels JSON
+          echo '${{ toJson(github.event.pull_request.labels) }}' > analysis-input/labels.json
+
           # Generate structured metadata JSON safely using environment variables
           python3 -c "
           import json, os, datetime
@@ -179,6 +190,51 @@ jobs:
         run: |
           pip install ./engine-repo
 
+      # Step 7.5: Detect Authorized Override Request (if present)
+      - name: Detect Gate Override Request
+        id: detect-override
+        if: steps.check-secret.outputs.skip_analysis != 'true'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          SENDER_LOGIN: ${{ github.event.sender.login }}
+        run: |
+          python3 -c "
+          import json, os, re
+
+          pr_body = os.environ.get('PR_BODY') or ''
+          pr_author = os.environ.get('PR_AUTHOR') or ''
+          sender_login = os.environ.get('SENDER_LOGIN') or ''
+
+          labels = []
+          try:
+              with open('analysis-input/labels.json', 'r') as f:
+                  labels_data = json.load(f)
+                  labels = [l.get('name', '').lower() for l in labels_data if isinstance(l, dict)]
+          except Exception:
+              pass
+
+          override_reason = ''
+          match = re.search(r'(?:\[(?:gate-)?override:\s*([^\]]+)\])|(?:Override-Reason:\s*([^\r\n]+))', pr_body, re.IGNORECASE)
+          if match:
+              override_reason = (match.group(1) or match.group(2) or '').strip()
+
+          override_user = ''
+          if 'gate-override' in labels:
+              # Maintainer applying label
+              override_user = sender_login or pr_author
+              if not override_reason:
+                  override_reason = f'PR labeled with gate-override by @{override_user}'
+          elif override_reason:
+              # Requester in PR body is attributed strictly to PR author
+              override_user = pr_author
+
+          print(f'Detected override: user={override_user}, reason={override_reason}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f'override_user={override_user}\n')
+              out.write(f'override_reason={override_reason}\n')
+          "
+
       # Step 8: Execute Cross-Repository Static Analysis Engine
       - name: Run Impact Analysis Engine
         id: run-engine
@@ -188,6 +244,10 @@ jobs:
           IMPACT_LLM_BASE_URL: ${{ secrets.IMPACT_LLM_BASE_URL || '' }}
           IMPACT_LLM_MODEL: ${{ secrets.IMPACT_LLM_MODEL || '' }}
           IMPACT_LLM_API_KEY: ${{ secrets.IMPACT_LLM_API_KEY || '' }}
+          IMPACT_GATE_MODE: ${{ vars.IMPACT_GATE_MODE || 'dry_run' }}
+          CROSS_REPO_READ_TOKEN: ${{ secrets.CROSS_REPO_READ_TOKEN }}
+          GATE_OVERRIDE_USER: ${{ steps.detect-override.outputs.override_user }}
+          GATE_OVERRIDE_REASON: ${{ steps.detect-override.outputs.override_reason }}
         run: |
           python3 -m engine \
             --repos ./primary-repo ./companion-repo \
@@ -199,7 +259,34 @@ jobs:
             --diff-file ./analysis-input/changes.diff \
             --base origin/${{ github.base_ref }} \
             --head HEAD \
+            --gate-mode "$IMPACT_GATE_MODE" \
             --strict
+
+      # Step 8.5: Extract Gate Decision Output
+      - name: Extract Gate Decision Output
+        id: extract-gate
+        if: steps.check-secret.outputs.skip_analysis != 'true'
+        run: |
+          python3 -c "
+          import json, os
+
+          try:
+              with open('impact-graph-output/impact-gate-result.json', 'r') as f:
+                  data = json.load(f)
+              decision = data.get('decision', 'UNKNOWN')
+              mode = data.get('gate_mode', 'dry_run')
+              blocking = str(data.get('blocking', False)).lower()
+          except Exception as e:
+              decision = 'ERROR'
+              mode = 'dry_run'
+              blocking = 'false'
+
+          print(f'Gate Decision: {decision}, Mode: {mode}, Blocking: {blocking}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f'gate_decision={decision}\n')
+              out.write(f'gate_mode={mode}\n')
+              out.write(f'is_blocked={blocking}\n')
+          "
 
       # Step 9: Upload Unified Dependency Graph Artifacts (retention 7 days)
       - name: Upload Dependency Graph Artifacts
@@ -287,3 +374,58 @@ jobs:
               });
               console.log('Created new integration comment on PR #' + prNumber);
             }
+
+  policy-gate:
+    name: Impact Analysis / Policy Gate
+    needs: impact-analysis
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Evaluate Policy Gate Decision
+        run: |
+          ANALYSIS_STATUS="${{ needs.impact-analysis.result }}"
+          SKIP_ANALYSIS="${{ needs.impact-analysis.outputs.skip_analysis }}"
+          GATE_DECISION="${{ needs.impact-analysis.outputs.gate_decision }}"
+          GATE_MODE="${{ needs.impact-analysis.outputs.gate_mode }}"
+          IS_BLOCKED="${{ needs.impact-analysis.outputs.is_blocked }}"
+
+          echo "================================================================="
+          echo "  IMPACT ANALYSIS - POLICY GATE STATUS CHECK                     "
+          echo "================================================================="
+          echo "Analysis Job Result: $ANALYSIS_STATUS"
+          echo "Skip Analysis:       $SKIP_ANALYSIS"
+          echo "Gate Mode:           $GATE_MODE"
+          echo "Gate Decision:       $GATE_DECISION"
+          echo "Is Blocked:          $IS_BLOCKED"
+
+          if [ "$ANALYSIS_STATUS" = "cancelled" ] || [ "$ANALYSIS_STATUS" = "failure" ]; then
+            echo "::error::Impact analysis workflow failed or was cancelled. Failing gate check (fail-closed)."
+            exit 1
+          fi
+
+          if [ "$SKIP_ANALYSIS" = "true" ]; then
+            echo "::notice::Cross-repository analysis was skipped (fork PR without secret). Policy gate passed (fail-open)."
+            exit 0
+          fi
+
+          if [ "$GATE_DECISION" = "BLOCK" ] || [ "$IS_BLOCKED" = "true" ]; then
+            echo "::error::Policy Gate FAILED: Decision is BLOCK under enforce mode. Merge protection active."
+            exit 1
+          elif [ "$GATE_DECISION" = "WOULD_BLOCK" ]; then
+            echo "::warning::Policy Gate Notice: Decision is WOULD_BLOCK (dry_run mode active). Merge allowed."
+            exit 0
+          elif [ "$GATE_DECISION" = "PASS_WITH_WARNING" ]; then
+            echo "::notice::Policy Gate Passed with warning (HIGH severity or non-blocking risks detected)."
+            exit 0
+          elif [ "$GATE_DECISION" = "PASS" ]; then
+            echo "✓ Policy Gate Passed successfully."
+            exit 0
+          elif [ "$GATE_DECISION" = "SKIPPED" ]; then
+            echo "Policy Gate was skipped."
+            exit 0
+          else
+            echo "Policy Gate completed with status: $GATE_DECISION"
+            exit 0
+          fi
