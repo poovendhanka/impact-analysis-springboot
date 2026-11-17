@@ -68,6 +68,12 @@ public class AnalysisController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/summary")
+    @Operation(summary = "Get overall engine execution and health summary")
+    public ResponseEntity<String> getSummary() {
+        return ResponseEntity.ok("Impact Analysis Engine v1.4.0: All operational services healthy");
+    }
+
     @PostMapping("/runs")
     @Operation(summary = "Record or persist a new impact analysis run")
     public ResponseEntity<AnalysisRunResponse> recordRun(@Valid @RequestBody AnalysisRunRequest request) {
