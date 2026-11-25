@@ -1,0 +1,58 @@
+name: Update Documentation
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - Stage
+    paths-ignore:
+      - "docs/**"
+
+permissions:
+  contents: write
+  copilot-requests: write
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Stage branch
+        uses: actions/checkout@v6
+        with:
+          ref: Stage
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+
+      - name: Install GitHub Copilot CLI
+        run: npm install -g @github/copilot
+
+      - name: Generate documentation
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ github.token }}
+        run: >
+          copilot -p
+          "Use the code-documentation skill.
+          Analyze the latest code in the Stage branch and recent changes.
+          Update docs/ARCHITECTURE.md, docs/API.md, and docs/CHANGE_HISTORY.md.
+          Do not modify application source code."
+          --allow-tool='shell(git:*)'
+          --allow-tool=write
+          --no-ask-user
+
+      - name: Commit documentation changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add docs/
+
+          if git diff --cached --quiet; then
+            echo "No documentation changes."
+          else
+            git commit -m "docs: update generated documentation"
+            git push origin Stage
+          fi
